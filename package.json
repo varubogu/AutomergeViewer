@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "workers:dev": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy",
+    "workers:dev": "wrangler dev",
+    "deploy": "wrangler deploy",
     "test": "vitest run"
   },
   "dependencies": {

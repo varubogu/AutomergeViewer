@@ -25,6 +25,8 @@ npm run dev
 
 このアプリは Worker スクリプトを持たない静的アセットです。ファイルの中身は Workers のコードでは処理しません。
 
+Cloudflare のデプロイコマンドが `npx wrangler deploy` でも、`wrangler.jsonc` の `build.command` が先に `vite build` を実行して `dist/` を作ります。
+
 ```bash
 npm run workers:dev
 npx wrangler login
