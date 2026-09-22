@@ -3,7 +3,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte"
 import wasm from "vite-plugin-wasm"
 
 export default defineConfig({
-  base: "./",
+  base: "/",
   plugins: [wasm(), svelte()],
   optimizeDeps: {
     exclude: ["@automerge/automerge"],
