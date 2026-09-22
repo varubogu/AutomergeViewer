@@ -21,6 +21,18 @@ npm run dev
 
 本番用の静的ファイルは `npm run build` で `dist/` に出ます。`npm run preview` でその成果物を確認できます。
 
+## Cloudflare Workers
+
+このアプリは Worker スクリプトを持たない静的アセットです。ファイルの中身は Workers のコードでは処理しません。
+
+```bash
+npm run workers:dev
+npx wrangler login
+npm run deploy
+```
+
+`workers:dev` はビルドした `dist/` をローカルの Workers ランタイムで配信します。未知のパスは `index.html` に戻します。Wasm は `application/wasm` で返します。
+
 ## 検索の書き方
 
 正規表現は、画面に出ているキーと値に対して一致します。`課長|主任` のように書き、置換では `$1` も使えます。
