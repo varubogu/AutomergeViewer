@@ -16,6 +16,10 @@ describe("Cloudflare Workers の静的配信", () => {
     expect(config.build.command).toBe("npm run build")
   })
 
+  it("wrangler preview に必要な previews ブロックを持つ", () => {
+    expect(config.previews).toEqual({})
+  })
+
   it("Wasm を application/wasm で返す", () => {
     expect(headers).toMatch(/\/assets\/\*\.wasm\s+Content-Type:\s*application\/wasm/)
   })
