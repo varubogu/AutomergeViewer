@@ -45,6 +45,15 @@ describe("Automerge文書の編集", () => {
     expect(fromBase64.doc.company.seizoubu.tanaka.role).toBe("課長")
   })
 
+  it("Automergeとして読めないバイトでも元バッファをJSON判定に使える", () => {
+    const json = new TextEncoder().encode(JSON.stringify({ title: "別の文書" }))
+    const shared = new Uint8Array(json)
+    const opened = openBytes(shared)
+    expect(opened.kind).toBe("json")
+    expect(opened.doc.title).toBe("別の文書")
+    expect(new TextDecoder().decode(shared)).toContain("別の文書")
+  })
+
   it("検索置換を1件の変更として反映する", () => {
     let doc = createSample()
     const tree = automergeToTree(doc)

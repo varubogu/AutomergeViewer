@@ -51,10 +51,13 @@ export function createSample() {
  * @returns {{ doc: AmDoc, kind: "automerge" | "base64" | "json" }}
  */
 export function openBytes(bytes) {
+  // Automerge.load は WASM 側でバッファを切り離すことがあるので、失敗時の JSON/Base64
+  // 判定用に元バイトを残し、読み込みにはコピーを渡す。
+  const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
   try {
-    return { doc: Automerge.load(bytes), kind: "automerge" }
+    return { doc: Automerge.load(new Uint8Array(source)), kind: "automerge" }
   } catch (first) {
-    const text = new TextDecoder().decode(bytes).trim()
+    const text = new TextDecoder().decode(source).trim()
     if (!text) throw first
     if (text.startsWith("{") || text.startsWith("[")) {
       let json
