@@ -117,12 +117,54 @@ export function buildHistoryIndex(doc) {
 }
 
 /**
+ * Automerge のスカラー文字列（Rust の ScalarValue::Str / JS の ImmutableString）。
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isImmutableStringValue(value) {
+  if (typeof Automerge.isImmutableString === "function") {
+    return Automerge.isImmutableString(value)
+  }
+  return Boolean(Automerge.ImmutableString && value instanceof Automerge.ImmutableString)
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isScalarObject(value) {
+  return Boolean(
+    Automerge.isCounter(value) ||
+      isImmutableStringValue(value) ||
+      value instanceof Date ||
+      value instanceof Uint8Array,
+  )
+}
+
+/**
+ * 競合を調べてよい Automerge のマップ / リストか。
+ * ImmutableString・Counter・Date などのスカラーには OBJECT_ID が無い。
+ * @param {unknown} live
+ * @returns {boolean}
+ */
+function isAutomergeContainer(live) {
+  if (live == null || typeof live !== "object" || isScalarObject(live)) return false
+  return Automerge.getObjectId(live) != null
+}
+
+/**
  * @param {unknown} value
  * @returns {unknown}
  */
 export function automergeToData(value) {
   if (Automerge.isCounter(value)) {
     return { __type: "counter", value: /** @type {{ value: number }} */ (value).value }
+  }
+  if (isImmutableStringValue(value)) {
+    return String(value)
+  }
+  if (value instanceof Date) {
+    return value.toISOString()
   }
   if (value instanceof Uint8Array) {
     return { __type: "bytes", value: bytesToBase64(value) }
@@ -144,12 +186,15 @@ export function automergeToData(value) {
  * @param {any} live
  */
 function attachConflicts(node, live) {
-  if (node.type === "object" && live && typeof live === "object") {
+  if (!isAutomergeContainer(live)) return
+  if (node.type === "object") {
     for (const entry of node.entries ?? []) {
       entry.child.conflicts = formatConflicts(Automerge.getConflicts(live, entry.key))
       attachConflicts(entry.child, live[entry.key])
     }
-  } else if (node.type === "array" && live) {
+    return
+  }
+  if (node.type === "array") {
     for (const child of node.children ?? []) {
       const index = /** @type {number} */ (child.path.at(-1))
       child.conflicts = formatConflicts(Automerge.getConflicts(live, index))
@@ -189,7 +234,8 @@ export function setAtPath(doc, path, payload) {
   }
   return Automerge.change(doc, `値を更新 (${formatPath(path)})`, (draft) => {
     const parent = getIn(draft, path.slice(0, -1))
-    parent[path.at(-1)] = toAutomergeValue(value)
+    const key = path.at(-1)
+    parent[key] = toAutomergeValue(value, parent[key])
   })
 }
 
@@ -302,7 +348,8 @@ function applyOps(doc, ops, message) {
       if (path.length === 0) throw new Error("ルート全体は置換できません")
       const parent = getIn(draft, path.slice(0, -1))
       if (parent == null) throw new Error("置換先が見つかりません")
-      parent[path.at(-1)] = toAutomergeValue(op.value)
+      const key = path.at(-1)
+      parent[key] = toAutomergeValue(op.value, parent[key])
     }
   })
 }
@@ -358,6 +405,10 @@ function cloneValue(value) {
   if (Automerge.isCounter(value)) {
     return { __type: "counter", value: /** @type {{ value: number }} */ (value).value }
   }
+  if (isImmutableStringValue(value)) {
+    return { __type: "str", value: String(value) }
+  }
+  if (value instanceof Date) return new Date(value.getTime())
   if (value instanceof Uint8Array) return new Uint8Array(value)
   if (value && typeof value === "object") return JSON.parse(JSON.stringify(automergeToData(value)))
   return value
@@ -365,16 +416,26 @@ function cloneValue(value) {
 
 /**
  * @param {unknown} value
+ * @param {unknown} [previous]
  * @returns {unknown}
  */
-function toAutomergeValue(value) {
+function toAutomergeValue(value, previous) {
   if (value instanceof Uint8Array) return value
   if (isMarker(value, "counter")) {
     const number = Number(value.value)
     if (!Number.isFinite(number)) throw new Error("カウンターの値が不正です")
     return new Automerge.Counter(number)
   }
+  if (isMarker(value, "str")) return new Automerge.ImmutableString(String(value.value ?? ""))
   if (isMarker(value, "bytes")) return base64ToBytes(String(value.value))
+  if (typeof value === "string" && isImmutableStringValue(previous)) {
+    return new Automerge.ImmutableString(value)
+  }
+  if (value instanceof Date) return value
+  if (typeof value === "string" && previous instanceof Date) {
+    const date = new Date(value)
+    if (!Number.isNaN(date.getTime())) return date
+  }
   if (Array.isArray(value)) return value.map((item) => toAutomergeValue(item))
   if (value && typeof value === "object") {
     /** @type {Record<string, unknown>} */
