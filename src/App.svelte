@@ -21,7 +21,10 @@
   let doc = createSample()
   let indexed = buildHistoryIndex(doc)
   let historyIndex = indexed.byPath
-  let tree = $state(automergeToTree(doc))
+  // ツリーは毎回作り直して代入するだけなので raw にする。深いプロキシだと
+  // キー付き each が同じキーのコンポーネントを使い回し、読み込み後も古いノードが残ることがある。
+  let tree = $state.raw(automergeToTree(doc))
+  let treeEpoch = $state(0)
   let filename = $state("sample.automerge")
   let status = $state("サンプルを表示しています。内容はこのブラウザの中だけで処理されます。")
   let error = $state("")
@@ -205,6 +208,28 @@
   }
 
   /**
+   * 別の文書に差し替える（ファイルを開く・サンプル）。編集の undo/redo とは違い、
+   * ツリーコンポーネントを載せ替えてローカルな編集状態も捨てる。
+   * @param {import("@automerge/automerge").Doc<any>} next
+   * @param {string} message
+   */
+  function replaceDocument(next, message) {
+    undoStack = []
+    redoStack = []
+    canUndo = false
+    canRedo = false
+    ctx.openMap = {}
+    ctx.activePath = ""
+    ctx.matches = new Set()
+    ctx.keyMatches = new Set()
+    ctx.matchStamp = ""
+    popover = null
+    pinned = false
+    treeEpoch += 1
+    refreshFrom(next, message)
+  }
+
+  /**
    * @param {import("@automerge/automerge").Doc<any>} next
    * @param {string} [message]
    */
@@ -299,14 +324,9 @@
   }
 
   function loadSample() {
-    undoStack = []
-    redoStack = []
-    canUndo = false
-    canRedo = false
     filename = "sample.automerge"
-    ctx.openMap = {}
     error = ""
-    refreshFrom(createSample(), "サンプルを表示しています。内容はこのブラウザの中だけで処理されます。")
+    replaceDocument(createSample(), "サンプルを表示しています。内容はこのブラウザの中だけで処理されます。")
   }
 
   /**
@@ -316,18 +336,13 @@
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
       const opened = openBytes(bytes)
-      undoStack = []
-      redoStack = []
-      canUndo = false
-      canRedo = false
       filename = file.name
-      ctx.openMap = {}
       error = ""
       const message =
         opened.kind === "json"
           ? "JSONを新しいAutomergeドキュメントとして読み込みました。履歴はここから始まります。"
           : "ファイルを読み込みました"
-      refreshFrom(opened.doc, message)
+      replaceDocument(opened.doc, message)
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "ファイルを読み込めません"
     }
@@ -340,7 +355,7 @@
     const input = /** @type {HTMLInputElement} */ (event.currentTarget)
     const file = input.files?.[0]
     input.value = ""
-    if (file) loadFile(file)
+    if (file) void loadFile(file)
   }
 
   /**
@@ -432,7 +447,15 @@
       <button type="button" class="ghost" onclick={loadSample}>サンプル</button>
       <button type="button" class="ghost" onclick={undo} disabled={!canUndo}>元に戻す</button>
       <button type="button" class="ghost" onclick={redo} disabled={!canRedo}>やり直す</button>
-      <input bind:this={fileInput} type="file" accept=".automerge,.json,application/json" hidden onchange={onFile} />
+      <input
+        bind:this={fileInput}
+        type="file"
+        accept=".automerge,.json,application/json,application/octet-stream"
+        class="sr-only"
+        tabindex="-1"
+        onchange={onFile}
+        oninput={onFile}
+      />
     </div>
   </header>
 
@@ -459,7 +482,9 @@
 
   <main>
     {#if dragging}<div class="drop">ここにファイルを放すと開きます</div>{/if}
-    <JsonNode node={tree} depth={0} {ctx} {actions} />
+    {#key treeEpoch}
+      <JsonNode node={tree} depth={0} {ctx} {actions} />
+    {/key}
   </main>
 
   <footer>
