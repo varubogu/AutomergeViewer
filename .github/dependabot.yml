@@ -1,0 +1,22 @@
+# Weekly Dependabot version updates.
+# Ecosystem values follow GitHub's current package-ecosystem list:
+# https://docs.github.com/en/code-security/dependabot/ecosystems-supported-by-dependabot/supported-ecosystems-and-repositories
+version: 2
+updates:
+  # npm: package.json and package-lock.json at the repository root.
+  # Minor and patch updates are opened together. Major updates stay separate.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
