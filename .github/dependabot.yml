@@ -1,10 +1,19 @@
 # Weekly Dependabot version updates.
 # Ecosystem values follow GitHub's current package-ecosystem list:
 # https://docs.github.com/en/code-security/dependabot/ecosystems-supported-by-dependabot/supported-ecosystems-and-repositories
+#
+# Grouping:
+# - This repository only has package.json and package-lock.json (npm).
+#   There is no .github/workflows, so the github-actions ecosystem is omitted.
+#   Adding it would make Dependabot fail to resolve a manifest.
+# - minor and patch for npm share one group.
+# - Related majors share a group and are listed first. A dependency joins the
+#   first matching group only. update-types do not overlap, so minor and patch
+#   updates of these packages still join npm-minor-and-patch.
+# - Unrelated majors (jsdom, wrangler, @automerge/automerge) stay ungrouped.
 version: 2
 updates:
   # npm: package.json and package-lock.json at the repository root.
-  # Minor and patch updates are opened together. Major updates stay separate.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -14,6 +23,23 @@ updates:
       timezone: "Asia/Tokyo"
     open-pull-requests-limit: 5
     groups:
+      # svelte and @sveltejs/* move together. @sveltejs/vite-plugin-svelte
+      # matches this group, not vite-major.
+      svelte-major:
+        patterns:
+          - "svelte"
+          - "@sveltejs/*"
+        update-types:
+          - "major"
+      # vite, vitest, and vite-plugin-* share a toolchain major.
+      vite-major:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+          - "vite-plugin-*"
+        update-types:
+          - "major"
       npm-minor-and-patch:
         patterns:
           - "*"
